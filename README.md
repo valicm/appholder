@@ -67,10 +67,14 @@ appholder rollback APPLICATION_ID
 appholder operations
 appholder remove APPLICATION_ID
 appholder uninstall APPLICATION_ID --yes
+appholder uninstall-app
+appholder uninstall-app --purge
 appholder self-update --check
 ```
 
 Update, rollback, remove, and uninstall operations normally require the daemon. **Remove** unregisters an app while keeping its file and saved versions. **Uninstall** permanently deletes that AppImage file; its saved versions remain subject to the retention setting.
+
+`uninstall-app` removes AppHolder itself and its generated desktop integration. It keeps your AppImages, settings, and saved versions by default. Add `--purge` to also delete AppHolder's configuration, metadata, and saved versions. AppImages in watched folders are kept either way.
 
 ## Updates and version history
 
@@ -127,6 +131,7 @@ For a local desktop build and test run:
 go build -tags desktop -o bin/appholder ./cmd/appholder
 go test -race ./...
 go test -tags desktop ./...
+shellcheck install.sh scripts/*.sh
 ```
 
 Release builds without `APPHOLDER_RELEASE_PUBLIC_KEY` cannot self-update. The release scripts can also publish to a generic HTTPS directory host, but GitHub Releases are the configured project path.

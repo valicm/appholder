@@ -1,11 +1,38 @@
 package metadata
 
 import (
+	"bytes"
+	"image"
+	"image/color"
+	"image/png"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
 )
+
+func TestSafePNGRejectsMalformedAndOversizedImages(t *testing.T) {
+	if safePNG([]byte("\x89PNG\r\n\x1a\ncorrupt")) {
+		t.Fatal("accepted malformed PNG")
+	}
+	var encoded bytes.Buffer
+	img := image.NewRGBA(image.Rect(0, 0, 2, 2))
+	img.Set(0, 0, color.White)
+	if err := png.Encode(&encoded, img); err != nil {
+		t.Fatal(err)
+	}
+	if !safePNG(encoded.Bytes()) {
+		t.Fatal("rejected valid PNG")
+	}
+	var oversized bytes.Buffer
+	img = image.NewRGBA(image.Rect(0, 0, 2049, 1))
+	if err := png.Encode(&oversized, img); err != nil {
+		t.Fatal(err)
+	}
+	if safePNG(oversized.Bytes()) {
+		t.Fatal("accepted oversized icon")
+	}
+}
 
 func TestDesktopMetadata(t *testing.T) {
 	name, version, err := parseDesktop("[Desktop Entry]\nName=Example\\sApp\nX-AppImage-Version=2.3\n[Desktop Action Launch]\nName=Wrong\n")
@@ -44,8 +71,12 @@ func TestReadRealSquashFS(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(metainfo, "org.example.Helper.metainfo.xml"), []byte(helper), 0600); err != nil {
 		t.Fatal(err)
 	}
-	png := []byte("\x89PNG\r\n\x1a\nfixture")
-	if err := os.WriteFile(filepath.Join(dir, "example.png"), png, 0600); err != nil {
+	var icon bytes.Buffer
+	if err := png.Encode(&icon, image.NewRGBA(image.Rect(0, 0, 2, 2))); err != nil {
+		t.Fatal(err)
+	}
+	pngData := icon.Bytes()
+	if err := os.WriteFile(filepath.Join(dir, "example.png"), pngData, 0600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Symlink("example.png", filepath.Join(dir, ".DirIcon")); err != nil {
@@ -70,7 +101,7 @@ func TestReadRealSquashFS(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Name != "Example App" || info.Version != "1.2.3" || string(info.PNG) != string(png) {
+	if info.Name != "Example App" || info.Version != "1.2.3" || !bytes.Equal(info.PNG, pngData) {
 		t.Fatalf("unexpected metadata: %+v", info)
 	}
 	if info.Identity != "appstream:org.example.App" || info.Developer != "Example Team" || info.License != "MIT" || info.Homepage != "https://example.org/app" || info.Summary != "Draw something" || len(info.Categories) != 2 || info.ArchitectureSource != "desktop" {

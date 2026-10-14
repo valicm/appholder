@@ -25,7 +25,7 @@ func TestEnableDisablePreservesCurrentSession(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(data), `Exec="/usr/local/bin/appholder" tray`) {
+	if !strings.Contains(string(data), `Exec="/usr/local/bin/appholder" tray`) || !strings.Contains(string(data), "Icon=appholder") {
 		t.Fatal(string(data))
 	}
 	if !c.Enabled() {

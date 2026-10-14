@@ -23,5 +23,5 @@ func send(title string, names []string) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	exec.CommandContext(ctx, "notify-send", "--app-name=AppHolder", "--icon=application-x-executable", "--", title, body).Run()
+	exec.CommandContext(ctx, "notify-send", "--app-name=AppHolder", "--icon=appholder", "--", title, body).Run()
 }

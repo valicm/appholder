@@ -7,6 +7,7 @@ import (
 	"debug/elf"
 	"encoding/binary"
 	"fmt"
+	"image/png"
 	"io"
 	"os"
 	"os/exec"
@@ -76,10 +77,24 @@ func Read(path string) (Info, error) {
 	component, _ := readAppStream(path, offset, rootDesktopName(path, offset))
 	applyAppStream(&info, component)
 	// Only accept PNG bytes; never render untrusted SVG or HTML in the UI.
-	if icon, err := cat(path, offset, ".DirIcon", 4*1024*1024); err == nil && bytes.HasPrefix(icon, []byte("\x89PNG\r\n\x1a\n")) {
+	if icon, err := cat(path, offset, ".DirIcon", 4*1024*1024); err == nil && safePNG(icon) {
 		info.PNG = icon
 	}
 	return info, nil
+}
+
+// safePNG validates embedded icons before handing them to GTK's image loader.
+// Small AppImage icons need no unbounded dimensions or decoder allocation.
+func safePNG(data []byte) bool {
+	if !bytes.HasPrefix(data, []byte("\x89PNG\r\n\x1a\n")) {
+		return false
+	}
+	config, err := png.DecodeConfig(bytes.NewReader(data))
+	if err != nil || config.Width < 1 || config.Height < 1 || config.Width > 2048 || config.Height > 2048 || int64(config.Width)*int64(config.Height) > 8*1024*1024 {
+		return false
+	}
+	_, err = png.Decode(bytes.NewReader(data))
+	return err == nil
 }
 
 func squashOffset(path string) (int64, error) {

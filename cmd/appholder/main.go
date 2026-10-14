@@ -25,6 +25,7 @@ import (
 	"appholder/internal/sandbox"
 	"appholder/internal/selfupdate"
 	"appholder/internal/startup"
+	"appholder/internal/uninstall"
 )
 
 func main() {
@@ -35,7 +36,7 @@ func main() {
 }
 func run() error {
 	if len(os.Args) < 2 {
-		fmt.Println("Usage: appholder <version|self-update|startup enable|disable|status|daemon|gui|tray|check-updates|update-all|update ID|rollback ID|remove ID|uninstall ID --yes|operations|open FILE|install-desktop|list|integrate FILE|run FILE|integrate-run FILE>")
+		fmt.Println("Usage: appholder <version|self-update|uninstall-app [--purge]|startup enable|disable|status|daemon|gui|tray|check-updates|update-all|update ID|rollback ID|remove ID|uninstall ID --yes|operations|open FILE|install-desktop|list|integrate FILE|run FILE|integrate-run FILE>")
 		return nil
 	}
 	command := os.Args[1]
@@ -72,6 +73,13 @@ func run() error {
 	}
 	if command == "self-update" {
 		return selfUpdate(os.Args[2:])
+	}
+	if command == "uninstall-app" {
+		purge := len(os.Args) == 3 && os.Args[2] == "--purge"
+		if len(os.Args) > 3 || (len(os.Args) == 3 && !purge) {
+			return fmt.Errorf("usage: appholder uninstall-app [--purge]")
+		}
+		return uninstall.Run(purge)
 	}
 	if command != "remove" && command != "uninstall" && command != "update-all" && command != "update" && command != "rollback" && command != "operations" && command != "check-updates" && command != "tray" && command != "open" && command != "install-desktop" && command != "gui" && command != "daemon" && command != "list" && command != "integrate" && command != "run" && command != "integrate-run" {
 		return fmt.Errorf("unknown command %q", command)

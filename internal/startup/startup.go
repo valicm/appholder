@@ -98,7 +98,7 @@ func (c *Controller) Enable() error {
 	unitPath := strings.NewReplacer("\\", "\\\\", "\"", "\\\"", "%", "%%", "$", "$$").Replace(c.Executable)
 	unitText := marker + fmt.Sprintf("[Unit]\nDescription=AppHolder AppImage manager\n\n[Service]\nType=simple\nExecStart=\"%s\" daemon\nRestart=on-failure\nRestartSec=5\n\n[Install]\nWantedBy=default.target\n", unitPath)
 	desktopPath := strings.NewReplacer("\\", "\\\\", "\"", "\\\"", "`", "\\`", "$", "\\$", "%", "%%").Replace(c.Executable)
-	desktopText := marker + fmt.Sprintf("[Desktop Entry]\nType=Application\nName=AppHolder\nComment=AppImage library and tray\nExec=\"%s\" tray\nIcon=application-x-executable\nTerminal=false\n", desktopPath)
+	desktopText := marker + fmt.Sprintf("[Desktop Entry]\nType=Application\nName=AppHolder\nComment=AppImage library and tray\nExec=\"%s\" tray\nIcon=appholder\nTerminal=false\n", desktopPath)
 	if err := write(unit, unitText); err != nil {
 		return err
 	}

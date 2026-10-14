@@ -65,3 +65,26 @@ func TestFoldersPersistAndRemovingWatchKeepsFilesAndHistory(t *testing.T) {
 		t.Fatal("invalid config replaced active folders")
 	}
 }
+
+func TestNewAppsUseSavedDefaultsAndCleanTechnicalName(t *testing.T) {
+	m, appsDir := fixture(t)
+	m.ConfigPath = filepath.Join(t.TempDir(), "config.json")
+	if err := m.SetAppDefaults(true, true, false); err != nil {
+		t.Fatal(err)
+	}
+	source := filepath.Join(t.TempDir(), "opencode-desktop-linux-x86_64_e113afd2f43e5928128e21e1de0d0112.AppImage")
+	fake(t, source)
+	app, err := m.Integrate(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if app.Name != "OpenCode" {
+		t.Fatalf("display name = %q", app.Name)
+	}
+	if !app.AutoUpdate || !app.Sandboxed || app.SandboxNetwork {
+		t.Fatalf("defaults not applied: %+v", app)
+	}
+	if _, err = os.Stat(filepath.Join(appsDir, filepath.Base(source))); err != nil {
+		t.Fatal(err)
+	}
+}

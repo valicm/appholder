@@ -24,9 +24,11 @@ jobs:
           REPOSITORY: ${{ github.repository }}
         run: |
           mkdir -p _site
+          mkdir -p _site/assets
           sed "s|__GITHUB_REPOSITORY__|$REPOSITORY|g" site/index.html > _site/index.html
           cp site/style.css _site/style.css
           cp assets/branding/svg/appholder-on-dark.svg _site/appholder-mark.svg
+          cp assets/main.png assets/details.png assets/settings.png _site/assets/
           touch _site/.nojekyll
       - uses: actions/upload-pages-artifact@v3
         with:

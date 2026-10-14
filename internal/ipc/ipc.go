@@ -234,7 +234,41 @@ func (s *Service) Handler() http.Handler {
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{"directories": s.Manager.Config.Directories, "backup_directory": filepath.Join(s.Manager.StateDir, "versions"), "keep_versions": s.Manager.Config.KeepVersions})
+		json.NewEncoder(w).Encode(map[string]any{"directories": s.Manager.Config.Directories, "backup_directory": filepath.Join(s.Manager.StateDir, "versions"), "keep_versions": s.Manager.Config.KeepVersions, "gui_theme": s.Manager.Config.GUITheme, "default_auto_update": s.Manager.Config.DefaultAutoUpdate, "default_sandboxed": s.Manager.Config.DefaultSandboxed, "default_sandbox_network": s.Manager.Config.DefaultSandboxNetwork})
+	})
+	mux.HandleFunc("POST /settings/theme", func(w http.ResponseWriter, r *http.Request) {
+		var request struct {
+			Theme string `json:"theme"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024)).Decode(&request); err != nil {
+			http.Error(w, "invalid theme", 400)
+			return
+		}
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if err := s.Manager.SetGUITheme(request.Theme); err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("POST /settings/defaults", func(w http.ResponseWriter, r *http.Request) {
+		var request struct {
+			AutoUpdate     bool `json:"default_auto_update"`
+			Sandboxed      bool `json:"default_sandboxed"`
+			SandboxNetwork bool `json:"default_sandbox_network"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024)).Decode(&request); err != nil {
+			http.Error(w, "invalid application defaults", 400)
+			return
+		}
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if err := s.Manager.SetAppDefaults(request.AutoUpdate, request.Sandboxed, request.SandboxNetwork); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
 	})
 	mux.HandleFunc("GET /info", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

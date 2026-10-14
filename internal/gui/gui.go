@@ -133,15 +133,31 @@ func display(socket, path string, tray bool) error {
 		}
 		defer response.Body.Close()
 		var settings struct {
-			Directories     []string `json:"directories"`
-			BackupDirectory string   `json:"backup_directory"`
-			KeepVersions    int      `json:"keep_versions"`
+			Directories           []string `json:"directories"`
+			BackupDirectory       string   `json:"backup_directory"`
+			KeepVersions          int      `json:"keep_versions"`
+			GUITheme              string   `json:"gui_theme"`
+			DefaultAutoUpdate     bool     `json:"default_auto_update"`
+			DefaultSandboxed      bool     `json:"default_sandboxed"`
+			DefaultSandboxNetwork bool     `json:"default_sandbox_network"`
 		}
 		if response.StatusCode == 200 && json.NewDecoder(response.Body).Decode(&settings) == nil {
 			folders := strings.Join(settings.Directories, "\n")
 			backup := settings.BackupDirectory
 			keep := settings.KeepVersions
-			postUI(func() { renderFolders(folders, backup); C.holder_settings_keep(C.int(keep)) })
+			theme := settings.GUITheme
+			autoDefault, sandboxDefault, networkDefault := settings.DefaultAutoUpdate, settings.DefaultSandboxed, settings.DefaultSandboxNetwork
+			if theme == "" {
+				theme = "system"
+			}
+			postUI(func() {
+				renderFolders(folders, backup)
+				C.holder_settings_keep(C.int(keep))
+				themeC := C.CString(theme)
+				defer C.free(unsafe.Pointer(themeC))
+				C.holder_theme(themeC)
+				C.holder_app_defaults(boolean(autoDefault), boolean(sandboxDefault), boolean(networkDefault))
+			})
 		}
 	})
 	if path != "" {
@@ -192,7 +208,7 @@ func refresh() {
 func render(snapshot []manager.App, operations map[string]ipc.Operation) {
 	apps = snapshot
 	C.holder_begin_refresh()
-	available, active := 0, 0
+	available, offered, active := 0, 0, 0
 	for _, a := range apps {
 		version := a.Version
 		if version == "" {
@@ -205,6 +221,7 @@ func render(snapshot []manager.App, operations map[string]ipc.Operation) {
 		switch a.Update.Status {
 		case "available":
 			text = "Update available"
+			offered++
 			if !a.Pinned {
 				available++
 			}
@@ -255,7 +272,7 @@ func render(snapshot []manager.App, operations map[string]ipc.Operation) {
 		if running {
 			text = strings.SplitN(text, " · ", 2)[0]
 		}
-		values := []string{a.ID, a.Name, version, a.Path, a.IconPath, text, a.Fingerprint, progressText}
+		values := []string{a.ID, a.DisplayName(), version, a.Path, a.IconPath, text, a.Fingerprint, progressText}
 		var stringsC []*C.char
 		for _, value := range values {
 			stringsC = append(stringsC, C.CString(value))
@@ -265,7 +282,7 @@ func render(snapshot []manager.App, operations map[string]ipc.Operation) {
 			C.free(unsafe.Pointer(value))
 		}
 	}
-	C.holder_finish(C.int(len(apps)), C.int(available), C.int(active))
+	C.holder_finish(C.int(len(apps)), C.int(available), C.int(offered), C.int(active))
 }
 func boolean(value bool) C.int {
 	if value {
@@ -461,6 +478,17 @@ func goHolderAction(action C.int, value *C.char) {
 				status("Sandbox disabled for the next launch.")
 			}
 		})
+	case 24:
+		body, _ := json.Marshal(map[string]string{"theme": path})
+		requestAction("/settings/theme", body, func([]byte) { status("Appearance preference saved.") })
+	case 25:
+		parts := strings.Split(path, "|")
+		if len(parts) != 3 {
+			status("Invalid application defaults.")
+			return
+		}
+		body, _ := json.Marshal(map[string]bool{"default_auto_update": parts[0] == "1", "default_sandboxed": parts[1] == "1", "default_sandbox_network": parts[2] == "1"})
+		requestAction("/settings/defaults", body, func([]byte) { settingsStatus("Defaults saved for newly added applications.") })
 	case 6, 7:
 		operation := "install"
 		if int(action) == 7 {

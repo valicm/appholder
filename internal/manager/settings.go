@@ -65,6 +65,31 @@ func (m *Manager) SetKeepVersions(count int) error {
 	return m.PruneVersions()
 }
 
+func (m *Manager) SetGUITheme(theme string) error {
+	if theme != "system" && theme != "light" && theme != "dark" {
+		return fmt.Errorf("theme must be system, light, or dark")
+	}
+	config := m.Config
+	config.GUITheme = theme
+	if err := writeJSON(m.ConfigPath, config); err != nil {
+		return err
+	}
+	m.Config = config
+	return nil
+}
+
+func (m *Manager) SetAppDefaults(autoUpdate, sandboxed, sandboxNetwork bool) error {
+	config := m.Config
+	config.DefaultAutoUpdate = autoUpdate
+	config.DefaultSandboxed = sandboxed
+	config.DefaultSandboxNetwork = sandboxNetwork
+	if err := writeJSON(m.ConfigPath, config); err != nil {
+		return err
+	}
+	m.Config = config
+	return nil
+}
+
 // PruneVersions removes oldest saved copies only after the shorter library is persisted.
 func (m *Manager) PruneVersions() error {
 	keep := m.Config.KeepVersions

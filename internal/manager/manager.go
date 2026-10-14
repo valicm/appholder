@@ -16,8 +16,12 @@ import (
 )
 
 type Config struct {
-	Directories  []string `json:"directories"`
-	KeepVersions int      `json:"keep_versions"`
+	Directories           []string `json:"directories"`
+	KeepVersions          int      `json:"keep_versions"`
+	GUITheme              string   `json:"gui_theme,omitempty"`
+	DefaultAutoUpdate     bool     `json:"default_auto_update,omitempty"`
+	DefaultSandboxed      bool     `json:"default_sandboxed,omitempty"`
+	DefaultSandboxNetwork bool     `json:"default_sandbox_network,omitempty"`
 }
 type App struct {
 	AutoUpdate       bool          `json:"auto_update,omitempty"`
@@ -39,6 +43,17 @@ type App struct {
 	IconPath         string        `json:"icon_path,omitempty"`
 	Fingerprint      string        `json:"fingerprint,omitempty"`
 }
+
+func (a App) DisplayName() string {
+	if a.Metadata.Name != "" {
+		return a.Metadata.Name
+	}
+	if a.Path != "" {
+		return displayNameFromFilename(a.Path)
+	}
+	return a.Name
+}
+
 type Manager struct {
 	Removed              map[string]RemovedApp
 	ConfigPath           string
@@ -64,7 +79,7 @@ func Load() (*Manager, error) {
 	if dataRoot == "" {
 		dataRoot = filepath.Join(home, ".local", "share")
 	}
-	m := &Manager{Config: Config{Directories: []string{filepath.Join(home, "Applications")}, KeepVersions: 3}, StateDir: filepath.Join(stateRoot, "appholder"), DesktopDir: filepath.Join(dataRoot, "applications")}
+	m := &Manager{Config: Config{Directories: []string{filepath.Join(home, "Applications")}, KeepVersions: 3, GUITheme: "system"}, StateDir: filepath.Join(stateRoot, "appholder"), DesktopDir: filepath.Join(dataRoot, "applications")}
 	configPath := filepath.Join(configRoot, "appholder", "config.json")
 	m.ConfigPath = configPath
 	b, err := os.ReadFile(configPath)
@@ -81,6 +96,12 @@ func Load() (*Manager, error) {
 	}
 	if m.Config.KeepVersions == 0 {
 		m.Config.KeepVersions = 3
+	}
+	if m.Config.GUITheme == "" {
+		m.Config.GUITheme = "system"
+	}
+	if m.Config.GUITheme != "system" && m.Config.GUITheme != "light" && m.Config.GUITheme != "dark" {
+		return nil, fmt.Errorf("gui_theme must be system, light, or dark")
 	}
 	if m.Config.KeepVersions < 1 || m.Config.KeepVersions > 100 {
 		return nil, fmt.Errorf("keep_versions must be between 1 and 100")
@@ -178,6 +199,33 @@ func desktopQuote(s string) string {
 	r := strings.NewReplacer("\\", "\\\\", "\"", "\\\"", "`", "\\`", "$", "\\$")
 	return "\"" + r.Replace(s) + "\""
 }
+
+func displayNameFromFilename(path string) string {
+	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	if cut := strings.LastIndexAny(name, "-_"); cut >= 0 {
+		suffix := name[cut+1:]
+		if len(suffix) >= 24 {
+			hex := true
+			for _, r := range suffix {
+				if !strings.ContainsRune("0123456789abcdefABCDEF", r) {
+					hex = false
+					break
+				}
+			}
+			if hex {
+				name = name[:cut]
+			}
+		}
+	}
+	for _, suffix := range []string{"-linux-x86_64", "-linux-aarch64", "-linux-arm64", "_linux-x86_64", "_linux-aarch64", "_linux-arm64", "-desktop"} {
+		name = strings.TrimSuffix(name, suffix)
+	}
+	if strings.EqualFold(name, "opencode") {
+		return "OpenCode"
+	}
+	return name
+}
+
 func (m *Manager) register(path string) (App, error) {
 	if strings.ContainsAny(path, "\n\r") {
 		return App{}, fmt.Errorf("unsupported newline in path")
@@ -194,8 +242,8 @@ func (m *Manager) register(path string) (App, error) {
 	}
 	sum := sha256.Sum256([]byte(path))
 	id := hex.EncodeToString(sum[:12])
-	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-	a := App{ID: id, Name: name, Path: path, RegisteredAt: time.Now().UTC()}
+	name := displayNameFromFilename(path)
+	a := App{ID: id, Name: name, Path: path, RegisteredAt: time.Now().UTC(), AutoUpdate: m.Config.DefaultAutoUpdate, Sandboxed: m.Config.DefaultSandboxed, SandboxNetwork: m.Config.DefaultSandboxNetwork}
 	var previous *App
 	for _, old := range m.Apps {
 		if old.ID == id {

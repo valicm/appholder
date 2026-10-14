@@ -4,6 +4,8 @@ AppHolder is an open-source Linux desktop app for keeping AppImages organized an
 
 AppHolder is under active development. The desktop app is written in Go with a GTK interface. The current build targets Linux on amd64 and arm64; the release workflow builds each architecture natively.
 
+![AppHolder application library showing installed AppImages, update status, and launch and options actions](assets/main.png)
+
 ## What it does
 
 - Watches configurable folders, defaulting to `~/Applications`. A newly dropped AppImage is registered after it remains unchanged across scans. It is never launched automatically.
@@ -11,9 +13,9 @@ AppHolder is under active development. The desktop app is written in Go with a G
 - Shows installed apps, extracted metadata, update state, and task progress in a searchable library. Multiple installed copies remain independently managed.
 - Checks AppImage update metadata for HTTPS zsync sources and GitHub release sources. It supports `latest`, `latest-pre`, `latest-all`, and explicit tags. Binary-only GitHub releases can use GitHub's asset SHA-256 digest when no `.zsync` asset is published.
 - Installs one or all available updates, verifies their size and digest, saves the previous file, and activates the replacement. Saved versions can be restored; retention is configurable and defaults to three.
-- Can enable automatic updates per app and send desktop notifications for new apps, available updates, and completed automatic updates.
-- Offers per-app Bubblewrap launching with a private persistent home and networking disabled by default. Network access can be enabled per app.
-- Provides a tray icon, startup controls, a single desktop-instance mechanism, and `appimg:` links for local files or HTTPS downloads.
+- Can enable automatic updates per app or set the default for new apps, and send desktop notifications for new apps, available updates, and completed automatic updates.
+- Offers per-app Bubblewrap launching with a private persistent home and networking disabled by default. Set sandbox and network-access defaults for newly added apps.
+- Provides a tray icon, startup controls, a single desktop-instance mechanism, `appimg:` links for local files or HTTPS downloads, and light, dark, or system-following themes.
 - Signs AppHolder release checksum manifests with Ed25519. The installer and self-updater verify the signature using a pinned public key.
 
 ## Install
@@ -45,7 +47,7 @@ appholder gui
 
 AppHolder starts a per-user daemon that watches the configured folders and performs update work. The desktop window and CLI communicate with it over a private Unix socket. The window can close while the daemon continues running. The installer enables startup by default using a systemd **user** service and a tray autostart entry. You can also control startup in Settings or with `appholder startup enable|disable|status`.
 
-The initial watched folder is `~/Applications`. Settings lets you add or remove watched folders, choose the backup location, and set the saved-version retention count. AppHolder respects `XDG_CONFIG_HOME`, `XDG_STATE_HOME`, and `XDG_DATA_HOME`:
+The initial watched folder is `~/Applications`. Settings lets you add or remove watched folders, set saved-version retention, choose application defaults, and select the appearance. Backups live under AppHolder's state directory. AppHolder respects `XDG_CONFIG_HOME`, `XDG_STATE_HOME`, and `XDG_DATA_HOME`:
 
 - Configuration: `$XDG_CONFIG_HOME/appholder/config.json` (normally `~/.config/appholder/config.json`)
 - State, backups, sandbox profiles, and incoming link downloads: `$XDG_STATE_HOME/appholder/` (normally `~/.local/state/appholder/`)

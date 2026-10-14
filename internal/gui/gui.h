@@ -14,7 +14,7 @@ void holder_versions(char *id, char *text);
 
 void holder_startup_state(int enabled);
 
-void holder_finish(int count, int updates, int active);
+void holder_finish(int count, int updates, int offered, int active);
 void holder_settings(char *folders, char *backup, int keep_versions);
 void holder_settings_keep(int keep_versions);
 void holder_settings_status(char *text);
@@ -26,3 +26,5 @@ void holder_version(char *text);
 void holder_update_available(int available);
 
 void holder_settings_folders(char *folders);
+void holder_theme(char *theme);
+void holder_app_defaults(int automatic, int sandbox, int network);

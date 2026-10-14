@@ -1,0 +1,106 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Install GTK build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libgtk-3-dev
+      - name: Configure pinned release key
+        env:
+          RELEASE_PUBLIC_KEY: ${{ vars.APPHOLDER_RELEASE_PUBLIC_KEY }}
+        run: |
+          if [[ -z "$RELEASE_PUBLIC_KEY" ]]; then
+            echo 'Set the APPHOLDER_RELEASE_PUBLIC_KEY repository variable to the PEM Ed25519 public key.' >&2
+            exit 1
+          fi
+          printf '%s' "$RELEASE_PUBLIC_KEY" > "$RUNNER_TEMP/appholder-release-public.pem"
+      - name: Build native binary
+        env:
+          APPHOLDER_RELEASE_PUBLIC_KEY: ${{ runner.temp }}/appholder-release-public.pem
+        run: bash scripts/build-release.sh "$GITHUB_REF_NAME" "https://github.com/$GITHUB_REPOSITORY"
+      - name: Prepare release artifact
+        run: |
+          mkdir -p artifact
+          cp "dist/$GITHUB_REF_NAME/appholder-linux-${{ matrix.arch }}" artifact/
+          if [[ "${{ matrix.arch }}" == amd64 ]]; then cp dist/install.sh artifact/; fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: appholder-${{ matrix.arch }}
+          path: artifact/
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Sign and publish GitHub Release
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Assemble and sign release assets
+        env:
+          RELEASE_PUBLIC_KEY: ${{ vars.APPHOLDER_RELEASE_PUBLIC_KEY }}
+          RELEASE_PRIVATE_KEY: ${{ secrets.APPHOLDER_SIGNING_KEY }}
+        run: |
+          if [[ -z "$RELEASE_PUBLIC_KEY" || -z "$RELEASE_PRIVATE_KEY" ]]; then
+            echo 'Configure APPHOLDER_RELEASE_PUBLIC_KEY (repository variable) and APPHOLDER_SIGNING_KEY (repository secret).' >&2
+            exit 1
+          fi
+          printf '%s' "$RELEASE_PUBLIC_KEY" > "$RUNNER_TEMP/appholder-release-public.pem"
+          printf '%s' "$RELEASE_PRIVATE_KEY" > "$RUNNER_TEMP/appholder-release-private.pem"
+          chmod 600 "$RUNNER_TEMP/appholder-release-private.pem"
+          version="$GITHUB_REF_NAME"
+          mkdir -p "dist/$version"
+          cp artifacts/appholder-linux-* "dist/$version/"
+          cp artifacts/install.sh dist/install.sh
+          (cd "dist/$version" && sha256sum appholder-linux-* > SHA256SUMS)
+          APPHOLDER_RELEASE_PUBLIC_KEY="$RUNNER_TEMP/appholder-release-public.pem" \
+            APPHOLDER_SIGNING_KEY="$RUNNER_TEMP/appholder-release-private.pem" \
+            bash scripts/sign-release.sh "$version"
+          (cd "dist/$version" && sha256sum -c SHA256SUMS && \
+            openssl pkeyutl -verify -pubin -inkey "$RUNNER_TEMP/appholder-release-public.pem" \
+              -rawin -in SHA256SUMS -sigfile SHA256SUMS.sig)
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$GITHUB_REF_NAME"
+          release_flags=(--title "AppHolder $version" --generate-notes)
+          if [[ "$version" == *-* ]]; then release_flags+=(--prerelease); fi
+          gh release create "$version" \
+            "dist/$version/appholder-linux-amd64" \
+            "dist/$version/appholder-linux-arm64" \
+            "dist/$version/SHA256SUMS" \
+            "dist/$version/SHA256SUMS.sig" \
+            dist/install.sh \
+            "${release_flags[@]}"

@@ -1,0 +1,46 @@
+name: GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - name: Build project site
+        env:
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          mkdir -p _site
+          sed "s|__GITHUB_REPOSITORY__|$REPOSITORY|g" site/index.html > _site/index.html
+          cp site/style.css _site/style.css
+          cp assets/branding/svg/appholder-on-dark.svg _site/appholder-mark.svg
+          touch _site/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-24.04
+    needs: build
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,29 @@
+# Go build and test output
+/bin/
+/dist/
+/site-dist/
+coverage.out
+*.test
+*.prof
+__pycache__/
+*.py[cod]
+
+# Local credentials and signing material
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Local IDE and operating-system files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# AppImage test downloads
+*.AppImage
